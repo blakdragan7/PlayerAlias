@@ -1,0 +1,9 @@
+{
+  "type": "Code",
+  "modid": "playeralias",
+  "name": "PlayerAlias",
+  "description": "Allows players to set a custom ingame alias for RP",
+  "authors": [ "blakdragan7" ],
+  "version": "0.1.0",
+  "side": "Universal"
+}
