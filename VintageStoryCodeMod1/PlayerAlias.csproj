@@ -69,6 +69,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="src\Config\PlayerAliasConfig.cs" />
+    <Compile Include="src\ModSystems\HideMapIndicators.cs" />
     <Compile Include="src\ModSystems\PlayerAliasClientMod.cs" />
     <Compile Include="src\ModSystems\PlayerAliasModSystem.cs" />
     <Compile Include="src\ModSystems\PlayerAliasServerMod.cs" />
