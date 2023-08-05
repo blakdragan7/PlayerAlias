@@ -4,6 +4,6 @@
   "name": "PlayerAlias",
   "description": "Allows players to set a custom ingame alias for RP",
   "authors": [ "blakdragan7" ],
-  "version": "1.0.0",
+  "version": "1.1.0",
   "side": "Universal"
 }

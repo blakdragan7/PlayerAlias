@@ -43,15 +43,10 @@ namespace VintageStoryCodeMod1.src.ModSystems
 
         private void EventOnPlayerNowPlaying(IServerPlayer byplayer)
         {
-            PlayerAliasData playerData;
-            if (config.PlayerAliases.TryGetValue(byplayer.PlayerUID, out playerData))
+            sapi.Network.GetChannel(FirstChannel).SendPacket(new OriginalUpdate()
             {
-                sapi.Network.GetChannel(AliasChannel).SendPacket(new AliasUpdate()
-                {
-                    Alias = playerData.Alias,
-                    PlayerUUID = byplayer.PlayerUID
-                }, byplayer);
-            }
+                PlayerAliases = config.PlayerAliases
+            }, byplayer);
         }
 
         private TextCommandResult SetAlias(TextCommandCallingArgs args)

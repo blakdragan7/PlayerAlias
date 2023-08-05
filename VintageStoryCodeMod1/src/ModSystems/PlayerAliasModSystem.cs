@@ -1,12 +1,8 @@
 ﻿using ProtoBuf;
-using Vintagestory.API.Client;
+using System.Collections.Generic;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.CommandAbbr;
-using Vintagestory.API.Datastructures;
-using Vintagestory.API.Server;
-using Vintagestory.Client.NoObf;
-using Vintagestory.GameContent;
 using VintageStoryCodeMod1.src.Config;
+using VintageStoryCodeMod1.src.ModSystems;
 
 namespace VintageStoryCodeMod1.src.ModSystems
 {
@@ -17,15 +13,23 @@ namespace VintageStoryCodeMod1.src.ModSystems
         public string PlayerUUID { get; set; }
     }
 
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    public class OriginalUpdate
+    {
+        public Dictionary<string, PlayerAliasData> PlayerAliases { get; set; }
+    };
+
     public class PlayerAliasModSystem : ModSystem
     {
         public override bool ShouldLoad(EnumAppSide forSide) => false;
         protected const string AliasChannel = "playeralias";
+        protected const string FirstChannel = "playeraliasf";
 
         public override void Start(ICoreAPI api)
         {
             base.Start(api);
             api.Network.RegisterChannel(AliasChannel).RegisterMessageType<AliasUpdate>();
+            api.Network.RegisterChannel(FirstChannel).RegisterMessageType<OriginalUpdate>();
         }
     }
 }
