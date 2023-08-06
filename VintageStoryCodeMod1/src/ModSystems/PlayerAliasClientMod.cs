@@ -26,6 +26,7 @@ namespace VintageStoryCodeMod1.src.ModSystems
         private ICoreClientAPI capi;
 
         private Dictionary<string, PlayerAliasDataClient> playerAliases = new Dictionary<string, PlayerAliasDataClient>();
+        private long mainTickId = 0;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -123,25 +124,35 @@ namespace VintageStoryCodeMod1.src.ModSystems
 
         private void FirstUpdate(OriginalUpdate update)
         {
-            foreach (var player in capi.World.AllOnlinePlayers)
+            mainTickId = capi.Event.RegisterGameTickListener(deltaTime =>
             {
-                update.PlayerAliases.TryGetValue(player.PlayerUID, out var data);
+                // we wait for the world to be started
+                if (capi.World?.AllOnlinePlayers == null)
+                    return;
 
-                PlayerAliasDataClient clientData;
-                if (!playerAliases.TryGetValue(player.PlayerUID, out clientData))
+                foreach (var player in capi.World.AllOnlinePlayers)
                 {
-                    clientData = new PlayerAliasDataClient()
+                    update.PlayerAliases.TryGetValue(player.PlayerUID, out var data);
+
+                    PlayerAliasDataClient clientData;
+                    if (!playerAliases.TryGetValue(player.PlayerUID, out clientData))
                     {
-                        Player = player as IClientPlayer,
-                    };
+                        clientData = new PlayerAliasDataClient()
+                        {
+                            Player = player as IClientPlayer,
+                        };
+                    }
+
+                    clientData.Alias = data?.Alias;
+                    clientData.IsSet = data?.IsSet ?? false;
+
+                    playerAliases[player.PlayerUID] = clientData;
+                    UpdateAlias(clientData);
                 }
 
-                clientData.Alias = data?.Alias;
-                clientData.IsSet = data?.IsSet ?? false;
-
-                playerAliases[player.PlayerUID] = clientData;
-                UpdateAlias(clientData);
-            }
+                capi.Event.UnregisterGameTickListener(mainTickId);
+                mainTickId = 0;
+            }, 100);
         }
     }
 }
