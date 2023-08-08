@@ -15,7 +15,7 @@ namespace VintageStoryCodeMod1.src.ModSystems
 {
     internal class PlayerAliasDataClient
     {
-        public IClientPlayer Player { get; set; }
+        public string PlayerId { get; set; }
         public string OriginalName { get; set; }
         public string Alias { get; set; }
         public bool IsSet { get; set; }
@@ -27,6 +27,7 @@ namespace VintageStoryCodeMod1.src.ModSystems
 
         private Dictionary<string, PlayerAliasDataClient> playerAliases = new Dictionary<string, PlayerAliasDataClient>();
         private long mainTickId = 0;
+        private long mainUpdateTickId = 0;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -55,7 +56,7 @@ namespace VintageStoryCodeMod1.src.ModSystems
             {
                 playerAliases.Add(byplayer.PlayerUID, new PlayerAliasDataClient()
                 {
-                    Player = byplayer,
+                    PlayerId = byplayer.PlayerUID,
                     OriginalName = byplayer.PlayerName,
                     IsSet = false
                 });
@@ -64,46 +65,50 @@ namespace VintageStoryCodeMod1.src.ModSystems
 
         private async void UpdateAlias(PlayerAliasDataClient data)
         {
-            await Task.Delay(1000);
+            await Task.Delay(2000);
             capi.Event.EnqueueMainThreadTask(() =>
             {
-                var watchedAttributes = data.Player?.Entity?.WatchedAttributes;
+                var player = GetClientPlayer(data.PlayerId);
+                var watchedAttributes = player?.Entity?.WatchedAttributes;
 
                 if (watchedAttributes == null)
                 {
-                    capi.Logger.Error($"Could not get player watched attribute when updating player {data.Player}");
+                    capi.Logger.Error($"Could not get player watched attribute when updating player {player}");
                     return;
                 }
 
                 var attribute = watchedAttributes.GetTreeAttribute("nametag");
                 if (attribute == null)
                 {
-                    capi.Logger.Error($"Could not get player attribute when updating player {data.Player}");
+                    capi.Logger.Error($"Could not get player attribute when updating player {player}");
                     return;
                 }
 
                 attribute.SetString("name", data.Alias);
                 watchedAttributes.MarkPathDirty("nametag");
-            }, "update Alias");
+
+                capi.Event.UnregisterGameTickListener(mainUpdateTickId);
+                mainUpdateTickId = 0;
+            }, "Alias Update");
         }
 
         private void AliasUpdate(AliasUpdate update)
         {
             PlayerAliasDataClient data;
             playerAliases.TryGetValue(update.PlayerUUID, out data);
+            var player = GetClientPlayer(update.PlayerUUID);
             // there has to be a better way to do this but this is good enough
             if (data != null)
             {
-                data.IsSet = data.Player.PlayerName != update.Alias;
+                data.IsSet = player.PlayerName != update.Alias;
                 data.Alias = update.Alias;
             }
             else
             {
-                var player = GetClientPlayer(update.PlayerUUID);
                 data = new PlayerAliasDataClient()
                 {
                     Alias = update.Alias,
-                    Player = player,
+                    PlayerId = player.PlayerUID,
                     IsSet = player.PlayerName != update.Alias
                 };
 
@@ -124,6 +129,9 @@ namespace VintageStoryCodeMod1.src.ModSystems
 
         private void FirstUpdate(OriginalUpdate update)
         {
+            if (update?.PlayerAliases == null)
+                return;
+
             mainTickId = capi.Event.RegisterGameTickListener(deltaTime =>
             {
                 // we wait for the world to be started
@@ -139,7 +147,7 @@ namespace VintageStoryCodeMod1.src.ModSystems
                     {
                         clientData = new PlayerAliasDataClient()
                         {
-                            Player = player as IClientPlayer,
+                            PlayerId = player.PlayerUID,
                         };
                     }
 
