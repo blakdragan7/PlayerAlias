@@ -73,6 +73,7 @@
     <Compile Include="src\ModSystems\PlayerAliasClientMod.cs" />
     <Compile Include="src\ModSystems\PlayerAliasModSystem.cs" />
     <Compile Include="src\ModSystems\PlayerAliasServerMod.cs" />
+    <Compile Include="src\Utils\MainThreadTimer.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="VintagestoryAPI">

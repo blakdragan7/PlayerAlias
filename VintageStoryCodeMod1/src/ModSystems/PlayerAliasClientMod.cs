@@ -10,6 +10,7 @@ using Vintagestory.API.Server;
 using Vintagestory.Client.NoObf;
 using Vintagestory.GameContent;
 using VintageStoryCodeMod1.src.Config;
+using VintageStoryCodeMod1.Utils;
 
 namespace VintageStoryCodeMod1.src.ModSystems
 {
@@ -26,8 +27,6 @@ namespace VintageStoryCodeMod1.src.ModSystems
         private ICoreClientAPI capi;
 
         private Dictionary<string, PlayerAliasDataClient> playerAliases = new Dictionary<string, PlayerAliasDataClient>();
-        private long mainTickId = 0;
-        private long mainUpdateTickId = 0;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -39,64 +38,66 @@ namespace VintageStoryCodeMod1.src.ModSystems
             base.StartClientSide(api);
             capi = api;
             capi.Event.PlayerEntitySpawn += EventOnPlayerEntitySpawn;
-            api.Network.GetChannel(AliasChannel).SetMessageHandler<AliasUpdate>(AliasUpdate);
-            api.Network.GetChannel(FirstChannel).SetMessageHandler<OriginalUpdate>(FirstUpdate);
+            api.Network.GetChannel(AliasChannel).SetMessageHandler<AliasUpdate>(AliasUpdateReceived);
+            api.Network.GetChannel(FirstChannel).SetMessageHandler<OriginalUpdate>(FirstUpdateReceived);
         }
 
-        private void EventOnPlayerEntitySpawn(IClientPlayer byplayer)
+        private void EventOnPlayerEntitySpawn(IClientPlayer player)
         {
-            if (playerAliases.TryGetValue(byplayer.PlayerUID, out var data))
+            if (playerAliases.TryGetValue(player.PlayerUID, out var data))
             {
-                data.OriginalName = byplayer.PlayerName;
-
                 if (data.IsSet)
                     UpdateAlias(data);
             }
             else
             {
-                playerAliases.Add(byplayer.PlayerUID, new PlayerAliasDataClient()
+                playerAliases.Add(player.PlayerUID, new PlayerAliasDataClient()
                 {
-                    PlayerId = byplayer.PlayerUID,
-                    OriginalName = byplayer.PlayerName,
+                    PlayerId = player.PlayerUID,
+                    OriginalName = player.PlayerName,
                     IsSet = false
                 });
             }
         }
 
-        private async void UpdateAlias(PlayerAliasDataClient data)
+        private void UpdateAlias(PlayerAliasDataClient data)
         {
-            await Task.Delay(2000);
-            capi.Event.EnqueueMainThreadTask(() =>
+            MainThreadTimer.Dispatch(capi, deltaTime =>
             {
                 var player = GetClientPlayer(data.PlayerId);
                 var watchedAttributes = player?.Entity?.WatchedAttributes;
 
                 if (watchedAttributes == null)
                 {
-                    capi.Logger.Error($"Could not get player watched attribute when updating player {player}");
-                    return;
+                    capi.Logger.Warning($"Could not get player watched attribute when updating player {player}");
+                    return true;
                 }
 
                 var attribute = watchedAttributes.GetTreeAttribute("nametag");
                 if (attribute == null)
                 {
-                    capi.Logger.Error($"Could not get player attribute when updating player {player}");
-                    return;
+                    capi.Logger.Warning($"Could not get player attribute when updating player {player}");
+                    return true;
                 }
 
                 attribute.SetString("name", data.Alias);
                 watchedAttributes.MarkPathDirty("nametag");
 
-                capi.Event.UnregisterGameTickListener(mainUpdateTickId);
-                mainUpdateTickId = 0;
-            }, "Alias Update");
+                return false;
+            }, 100);
         }
 
-        private void AliasUpdate(AliasUpdate update)
+        private void AliasUpdateReceived(AliasUpdate update)
         {
             PlayerAliasDataClient data;
             playerAliases.TryGetValue(update.PlayerUUID, out data);
             var player = GetClientPlayer(update.PlayerUUID);
+
+            if (player == null)
+            {
+                capi.Logger.Error($"Could not find player to update {update.PlayerUUID}");
+            }
+            
             // there has to be a better way to do this but this is good enough
             if (data != null)
             {
@@ -111,11 +112,6 @@ namespace VintageStoryCodeMod1.src.ModSystems
                     PlayerId = player.PlayerUID,
                     IsSet = player.PlayerName != update.Alias
                 };
-
-                if (player == null)
-                {
-                    capi.Logger.Error("Could not find player to update alias for");
-                }
             }
 
             playerAliases[update.PlayerUUID] = data;
@@ -127,23 +123,22 @@ namespace VintageStoryCodeMod1.src.ModSystems
             return (from player in capi.World.AllOnlinePlayers where player.PlayerUID == uuid select player as IClientPlayer).FirstOrDefault();
         }
 
-        private void FirstUpdate(OriginalUpdate update)
+        private void FirstUpdateReceived(OriginalUpdate update)
         {
             if (update?.PlayerAliases == null)
                 return;
 
-            mainTickId = capi.Event.RegisterGameTickListener(deltaTime =>
+            MainThreadTimer.Dispatch(capi,deltaTime =>
             {
                 // we wait for the world to be started
                 if (capi.World?.AllOnlinePlayers == null)
-                    return;
+                    return true;
 
                 foreach (var player in capi.World.AllOnlinePlayers)
                 {
                     update.PlayerAliases.TryGetValue(player.PlayerUID, out var data);
 
-                    PlayerAliasDataClient clientData;
-                    if (!playerAliases.TryGetValue(player.PlayerUID, out clientData))
+                    if (!playerAliases.TryGetValue(player.PlayerUID, out var clientData))
                     {
                         clientData = new PlayerAliasDataClient()
                         {
@@ -158,8 +153,7 @@ namespace VintageStoryCodeMod1.src.ModSystems
                     UpdateAlias(clientData);
                 }
 
-                capi.Event.UnregisterGameTickListener(mainTickId);
-                mainTickId = 0;
+                return false;
             }, 100);
         }
     }
